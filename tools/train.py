@@ -9,11 +9,13 @@ from tqdm import tqdm
 import module.models as models
 import learner
 import time
+import argparse
 
 def train(args):
     # system configuration
-    use_cuda = True
-    device = torch.device("cuda:0" if use_cuda and torch.cuda.is_available() else "cpu")
+    use_cuda = args.use_cuda
+    cuda_id = "cuda:" + str(args.cuda_device)
+    device = torch.device(cuda_id if use_cuda and torch.cuda.is_available() else "cpu")
     fn.set_seed(seed=2023, flag=True)
 
     torch.cuda.empty_cache()
