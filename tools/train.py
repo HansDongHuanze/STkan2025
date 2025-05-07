@@ -32,7 +32,7 @@ def train(args):
     mode = 'completed'  # 'simplified' or 'completed'
     is_pre_train = True
 
-    train_occupancy, train_price, train_loader, valid_loader, test_loader, adj_dense = data_switcher.get_data_loaders(seq_l, pre_l, device, bs)
+    train_occupancy, train_price, train_loader, valid_loader, test_loader, adj_dense = data_switcher.get_data_loaders(dataset, seq_l, pre_l, device, bs)
 
     adj_dense_cuda = adj_dense.to(device)
     adj_sparse = adj_dense.to_sparse_coo().to(device)
