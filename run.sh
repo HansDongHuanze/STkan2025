@@ -2,6 +2,7 @@
 # example: bash ./run.sh model_name="KAN" seq_len=12 pre_len=6
 
 model_name="KAN"
+dataset="ST-EVCDP"
 seq_len=12
 pre_len=6
 
@@ -26,6 +27,10 @@ for ARG in "$@"; do
       model_name="${ARG#*=}"
       shift
       ;;
+    dataset=*)
+      dataset="${ARG#*=}"
+      shift
+      ;;
     seq_len=*)
       seq_len="${ARG#*=}"
       shift
@@ -41,6 +46,30 @@ for ARG in "$@"; do
   esac
 done
 
+pems="./data/PEMS-BAY"
+pems_link="https://drive.google.com/drive/folders/10FOTa6HXPqX8Pf5WRoRwcFnW9BrNZEIX"
+if [[ "$dataset" == "PEMS-BAY" ]]; then
+  echo "Checking dataset PEMS-BAY:"
+  if [ ! -d "$pems" ]; then
+    mkdir -p "$pems" && echo "make dictionary $pems"
+    echo "please dowload file from $pems_link and put it into $pems (./data/PEMS-BAY/pems-bay.h5) and execute 'bash run.sh' again" 
+    exit 1
+  elif [ ! -f "./data/PEMS-BAY/pems-bay.h5" ]; then
+    echo "please dowload file from $pems_link and put it into $pems (./data/PEMS-BAY/pems-bay.h5) and execute 'bash run.sh' again"
+    exit 1
+  elif [ ! -f "./data/PEMS-BAY/test.npz" ] || [ ! -f "./data/PEMS-BAY/train.npz" ] || [ ! -f "./data/PEMS-BAY/val.npz" ]; then
+    python -m scripts.generate_PEMS_data --output_dir=data/PEMS-BAY --traffic_df_filename=data/PEMS-BAY/pems-bay.h5
+  else
+    echo "Series data collected!"
+  fi
+  if [ ! -f "./data/PEMS-BAY/adj_mx_bay.pkl" ]; then
+    echo "please dowload file from https://github.com/liyaguang/DCRNN/blob/master/data/sensor_graph/adj_mx_bay.pkl and put it into $pems (./data/PEMS-BAY/adj_mx_bay.pkl) and execute 'bash run.sh' again"
+    exit 1
+  else
+    echo "Adjustancy matrix collected!"
+  fi
+fi
+
 model_list=("KAN" "Wavelet")
 
 if [ ${#pre_len_arr[@]} -eq 0 ]; then
@@ -52,12 +81,14 @@ for p in "${pre_len_arr[@]}"; do
       for mod in "${model_list[@]}"; do
           python -u start.py \
           --model_name="$mod" \
+          --dataset="$dataset" \
           --seq_len="$seq_len" \
           --pre_len="$p"
       done
   else
       python -u start.py \
       --model_name="$model_name" \
+      --dataset="$dataset" \
       --seq_len="$seq_len" \
       --pre_len="$p"
   fi

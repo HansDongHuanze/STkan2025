@@ -1,15 +1,14 @@
-import copy
-import module.baselines as baselines
 import torch
 import numpy as np
 import pandas as pd
-import tools.functions as fn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import module.models as models
-import tools.learner as learner
+from module import models
+from module import baselines
+from tools import learner
+from tools import functions as fn
+from tools import data_switcher
 import time
-import argparse
 from module import Wave_graph_EKF_KAN
 
 def train(args):
@@ -17,13 +16,13 @@ def train(args):
     use_cuda = args.use_cuda
     cuda_id = "cuda:" + str(args.cuda_device)
     device = torch.device(cuda_id if use_cuda and torch.cuda.is_available() else "cpu")
-    fn.set_seed(seed=2023, flag=True)
-
+    fn.set_seed(seed=args.random_seed, flag=True)
+    dataset=args.dataset
     torch.cuda.empty_cache()
 
     # hyper params
     model_name = args.model_name
-    seq_l = 12
+    seq_l = args.seq_len
     pre_l = args.pre_len
     bs = 512
     p_epoch = 200
@@ -33,24 +32,10 @@ def train(args):
     mode = 'completed'  # 'simplified' or 'completed'
     is_pre_train = True
 
-    # input data
-    occ, prc, adj, col, dis, cap, tim, inf = fn.read_dataset()
-    adj_dense = torch.Tensor(adj)
+    train_occupancy, train_price, train_loader, valid_loader, test_loader, adj_dense = data_switcher.get_data_loaders(seq_l, pre_l, device, bs)
+
     adj_dense_cuda = adj_dense.to(device)
     adj_sparse = adj_dense.to_sparse_coo().to(device)
-
-    # dataset division
-    train_occupancy, valid_occupancy, test_occupancy = fn.division(occ, train_rate=0.6, valid_rate=0.2, test_rate=0.2)
-    nodes = train_occupancy.shape[-1]
-    train_price, valid_price, test_price = fn.division(prc, train_rate=0.6, valid_rate=0.2, test_rate=0.2)
-
-    # data
-    train_dataset = fn.CreateDataset(train_occupancy, train_price, seq_l, pre_l, device, adj_dense)
-    train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True, drop_last=True)
-    valid_dataset = fn.CreateDataset(valid_occupancy, valid_price, seq_l, pre_l, device, adj_dense)
-    valid_loader = DataLoader(valid_dataset, batch_size=len(valid_occupancy), shuffle=False)
-    test_dataset = fn.CreateDataset(test_occupancy, test_price, seq_l, pre_l, device, adj_dense)
-    test_loader = DataLoader(test_dataset, batch_size=len(test_occupancy), shuffle=False)
 
     # training setting
     # model = models.PAG(a_sparse=adj_sparse).to(device)  # init model

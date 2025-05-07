@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser.add_argument('--bs', type=int, default=512)
     parser.add_argument('--p_epoch', type=int, default=200)
     parser.add_argument('--n_epoch', type=int, default=1000)
-    parser.add_argument('--dataset', type=str, default="")
+    parser.add_argument('--dataset', type=str, default="ST-EVCDP")
     parser.add_argument('--is_train', type=bool, default=True)
     parser.add_argument('--is_pre_train', type=bool, default=True)
     parser.add_argument('--random_seed', type=int, default=2025)

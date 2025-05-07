@@ -10,3 +10,4 @@ torchvision==0.15.2
 tqdm
 geopy
 torch_geometric
+tables
