@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import tools.functions as fn
+import functions as fn
 import copy
 
 use_cuda = True

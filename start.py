@@ -1,5 +1,5 @@
 import argparse
-import tools.train as train
+from tools.train import train
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Argument received.")

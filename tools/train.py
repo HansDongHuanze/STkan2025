@@ -7,9 +7,10 @@ import tools.functions as fn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import module.models as models
-import learner
+import tools.learner as learner
 import time
 import argparse
+from module import Wave_graph_EKF_KAN
 
 def train(args):
     # system configuration
@@ -21,9 +22,9 @@ def train(args):
     torch.cuda.empty_cache()
 
     # hyper params
-    model_name = 'PAG'
+    model_name = args.model_name
     seq_l = 12
-    pre_l = 6
+    pre_l = args.pre_len
     bs = 512
     p_epoch = 200
     n_epoch = 1000
@@ -57,7 +58,7 @@ def train(args):
     # model = baselines.VAR().to(device)
     # model = baselines.FCN().to(device)
     # model = baselines.GCN(seq_l, 2, adj_dense_cuda).to(device)
-    model = baselines.GAT(seq_l, 2, adj_dense_cuda).to(device)
+    # model = baselines.GAT(seq_l, 2, adj_dense_cuda).to(device)
     # model = baselines.LSTM(seq_l, 2).to(device)
     # model = baselines.TransformerModel(seq_l, 32, 16, 2, 1, 4, 32, 0.5) # input_dim, embedding_dim, hidden_dim, output_dim, n_layers, n_heads, pf_dim, dropout
     # model = baselines.STGCN(seq_l, 2, adj_dense_cuda).to(device)
@@ -66,10 +67,13 @@ def train(args):
     # model = baselines.HSTGCN(seq_l, 2, adj_dense_cuda, adj_dense_cuda).to(device)
     # model = baselines.TPA(seq_l, 2, nodes).to(device)
     # model = GAF.GATWithFourier(seq_l, 2, adj_dense_cuda).to(device)
+    model = Wave_graph_EKF_KAN.KAN(input_dim=seq_l, output_dim=pre_l).to(device)
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=0.00001)
 
     loss_function = torch.nn.MSELoss()
     valid_loss = 100
+
+    print(f"----Starting training {model_name} model with prediction horizen {pre_l}----")
 
     if is_train is True:
         model.train()
@@ -84,11 +88,6 @@ def train(args):
 
         for epoch in tqdm(range(n_epoch), desc='Fine-tuning'):
             for j, data in enumerate(train_loader):
-                '''
-                occupancy = (batch, seq, node)
-                price = (batch, seq, node)
-                label = (batch, node)
-                '''
                 model.train()
                 occupancy, price, label = data
 
@@ -101,11 +100,6 @@ def train(args):
             # validation
             model.eval()
             for j, data in enumerate(valid_loader):
-                '''
-                occupancy = (batch, seq, node)
-                price = (batch, seq, node)
-                label = (batch, node)
-                '''
                 model.train()
                 occupancy, price, label = data
                 predict = model(occupancy, price)
@@ -114,12 +108,15 @@ def train(args):
                     valid_loss = loss.item()
                     torch.save(model, './checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
 
+    print(f"----Training finished!----")
+    
     model = torch.load('./checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
+    print(f"----Model was saved into folder: {'./checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt'}")
     # test
     model.eval()
     result_list = []
-    predict_list = np.zeros([1, adj_dense.shape[1]])
-    label_list = np.zeros([1, adj_dense.shape[1]])
+    predict_list = []
+    label_list = []
 
     # Initialize lists to store time and memory usage
     time_list = []
@@ -149,11 +146,11 @@ def train(args):
             end_time = time.time()
             elapsed_time = end_time - start_time
             time_list.append(elapsed_time)
+            predict_list.append(predict)
+            label_list.append(label)
 
-            predict = predict.cpu().detach().numpy()
-            label = label.cpu().detach().numpy()
-            predict_list = np.concatenate((predict_list, predict), axis=0)
-            label_list = np.concatenate((label_list, label), axis=0)
+    predict_list = torch.cat(predict_list, dim=0).view(-1, pre_l).cpu().detach().numpy()
+    label_list = torch.cat(label_list, dim=0).view(-1, pre_l).cpu().detach().numpy()
 
     output_no_noise = fn.metrics(test_pre=predict_list[1:, :], test_real=label_list[1:, :])
     result_list.append(output_no_noise)

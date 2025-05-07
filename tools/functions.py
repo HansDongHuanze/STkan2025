@@ -7,12 +7,12 @@ from sklearn.metrics import mean_squared_error,mean_absolute_error,r2_score,mean
 
 
 def read_dataset():
-    occ = pd.read_csv('datasets/occupancy.csv', index_col=0, header=0)
-    inf = pd.read_csv('datasets/information.csv', index_col=None, header=0)
-    prc = pd.read_csv('datasets/price.csv', index_col=0, header=0)
-    adj = pd.read_csv('datasets/adj.csv', index_col=0, header=0)  # check
-    dis = pd.read_csv('datasets/distance.csv', index_col=0, header=0)
-    time = pd.read_csv('datasets/time.csv', index_col=None, header=0)
+    occ = pd.read_csv('data/ST-EVCDP/occupancy.csv', index_col=0, header=0)
+    inf = pd.read_csv('data/ST-EVCDP/information.csv', index_col=None, header=0)
+    prc = pd.read_csv('data/ST-EVCDP/price.csv', index_col=0, header=0)
+    adj = pd.read_csv('data/ST-EVCDP/adj.csv', index_col=0, header=0)  # check
+    dis = pd.read_csv('data/ST-EVCDP/distance.csv', index_col=0, header=0)
+    time = pd.read_csv('data/ST-EVCDP/time.csv', index_col=None, header=0)
 
     col = occ.columns
     cap = np.array(inf['count'], dtype=float).reshape(1, -1)  # parking_capability
