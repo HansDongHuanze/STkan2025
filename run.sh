@@ -5,6 +5,7 @@ model_name="KAN"
 dataset="ST-EVCDP"
 seq_len=12
 pre_len=6
+is_pre_train=True
 
 result_dir="./results"
 if [ ! -d "$result_dir" ]; then
@@ -37,6 +38,10 @@ for ARG in "$@"; do
       ;;
     pre_len=*)
       IFS=',' read -ra pre_len_arr <<< "${ARG#*=}"
+      shift
+      ;;
+    is_pre_train=*)
+      is_pre_train="${ARG#*=}"
       shift
       ;;
     *)
@@ -83,14 +88,16 @@ for p in "${pre_len_arr[@]}"; do
           --model_name="$mod" \
           --dataset="$dataset" \
           --seq_len="$seq_len" \
-          --pre_len="$p"
+          --pre_len="$p" \
+          --is_pre_train="$is_pre_train"
       done
   else
       python -u start.py \
       --model_name="$model_name" \
       --dataset="$dataset" \
       --seq_len="$seq_len" \
-      --pre_len="$p"
+      --pre_len="$p" \
+      --is_pre_train="$is_pre_train"
   fi
 done
 

@@ -10,8 +10,8 @@ def get_data_loaders(data_name, seq_l, pre_l, device, bs):
         train_occupancy, train_price, valid_occupancy, valid_price, test_occupancy,  test_price, adj_dense, train_dataset, test_dataset, valid_dataset = get_ST_EVCDP(seq_l, pre_l, device)
     elif data_name == "PEMS-BAY":
         train_occupancy, train_price, valid_occupancy, valid_price, test_occupancy,  test_price, adj_dense, train_dataset, test_dataset, valid_dataset = get_PEMS(seq_l, pre_l, device)
-        train_occupancy = train_occupancy.reshape(-1, train_occupancy.shape[-1])[:10000,...]
-        train_price = train_price.reshape(-1, train_price.shape[-1])[:10000,...]
+        train_occupancy = train_occupancy.reshape(-1, train_occupancy.shape[-1])[:5000,...]
+        train_price = train_price.reshape(-1, train_price.shape[-1])[:5000,...]
     else: 
         raise FileNotFoundError(f"Unexisting dataset {data_name}!")
 
@@ -53,25 +53,25 @@ def get_PEMS(seq_l, pre_l, device):
         adj = pickle.load(file, encoding='latin1')[2]
         adj_dense = torch.Tensor(adj)
 
-    train_occupancy = train_x[...,0]
-    train_price = train_x[...,1]
-    train_dataset = CreatePEMSDataset(train_occupancy, train_price, train_y[...,0], seq_l, pre_l, device, adj)
+    train_occupancy = train_x[:5000,...,0]
+    train_price = train_x[:5000,...,1]
+    train_dataset = CreatePEMSDataset(train_occupancy, train_price, train_y[:5000,...,0], seq_l, pre_l, device, adj)
 
-    test_occupancy = test_x[...,0]
-    test_price = test_x[...,1]
-    test_dataset = CreatePEMSDataset(test_occupancy, test_price, test_y[...,0], seq_l, pre_l, device, adj)
+    test_occupancy = train_x[5000:7000,...,0]
+    test_price = train_x[5000:7000,...,1]
+    test_dataset = CreatePEMSDataset(test_occupancy, test_price, train_y[5000:7000,...,0], seq_l, pre_l, device, adj)
 
-    valid_occupancy = val_x[...,0]
-    valid_price = val_x[...,1]
-    valid_dataset = CreatePEMSDataset(valid_occupancy, valid_price, val_y[...,0], seq_l, pre_l, device, adj)
+    valid_occupancy = train_x[7000:10000,...,0]
+    valid_price = train_x[7000:10000,...,1]
+    valid_dataset = CreatePEMSDataset(valid_occupancy, valid_price, train_y[7000:10000,...,0], seq_l, pre_l, device, adj)
 
     return train_occupancy, train_price, valid_occupancy, valid_price, test_occupancy,  test_price, adj_dense, train_dataset, test_dataset, valid_dataset
 
 class CreatePEMSDataset(Dataset):
     def __init__(self, occ, prc, label, lb, pt, device, adj):
-        self.occ = torch.Tensor(occ)[...,:lb]
-        self.prc = torch.Tensor(prc)[...,:lb]
-        self.label = torch.Tensor(label)[...,:pt]
+        self.occ = torch.Tensor(occ)[:1000,:lb,:]
+        self.prc = torch.Tensor(prc)[:1000,:lb,:]
+        self.label = torch.Tensor(label)[:1000,:pt,:]
         self.device = device
 
     def __len__(self):

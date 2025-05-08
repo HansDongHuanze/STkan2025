@@ -1,15 +1,13 @@
 import torch
+from torch.optim.lr_scheduler import OneCycleLR
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader
 from tqdm import tqdm
-from module import models
-from module import baselines
 from tools import learner
 from tools import functions as fn
 from tools import data_switcher
+from tools import model_switcher
 import time
-from module import Wave_graph_EKF_KAN
 
 def train(args):
     # system configuration
@@ -30,7 +28,7 @@ def train(args):
     law_list = np.array([-1.48, -0.74])  # price elasticities of demand for EV charging. Recommend: up to 5 elements.
     is_train = True
     mode = 'completed'  # 'simplified' or 'completed'
-    is_pre_train = True
+    is_pre_train = args.is_pre_train
 
     train_occupancy, train_price, train_loader, valid_loader, test_loader, adj_dense = data_switcher.get_data_loaders(dataset, seq_l, pre_l, device, bs)
 
@@ -38,22 +36,9 @@ def train(args):
     adj_sparse = adj_dense.to_sparse_coo().to(device)
 
     # training setting
-    # model = models.PAG(a_sparse=adj_sparse).to(device)  # init model
-    # model = baselines.FGN()
-    # model = baselines.VAR().to(device)
-    # model = baselines.FCN().to(device)
-    # model = baselines.GCN(seq_l, 2, adj_dense_cuda).to(device)
-    # model = baselines.GAT(seq_l, 2, adj_dense_cuda).to(device)
-    # model = baselines.LSTM(seq_l, 2).to(device)
-    # model = baselines.TransformerModel(seq_l, 32, 16, 2, 1, 4, 32, 0.5) # input_dim, embedding_dim, hidden_dim, output_dim, n_layers, n_heads, pf_dim, dropout
-    # model = baselines.STGCN(seq_l, 2, adj_dense_cuda).to(device)
-    # model = baselines.LstmGcn(seq_l, 2, adj_dense_cuda).to(device)
-    # model = baselines.LstmGat(seq_l, 2, adj_dense_cuda, adj_sparse).to(device)
-    # model = baselines.HSTGCN(seq_l, 2, adj_dense_cuda, adj_dense_cuda).to(device)
-    # model = baselines.TPA(seq_l, 2, nodes).to(device)
-    # model = GAF.GATWithFourier(seq_l, 2, adj_dense_cuda).to(device)
-    model = Wave_graph_EKF_KAN.KAN(input_dim=seq_l, output_dim=pre_l).to(device)
+    model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device)
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=0.00001)
+    # scheduler = OneCycleLR(optimizer, max_lr=0.01, total_steps=n_epoch, verbose=True)
 
     loss_function = torch.nn.MSELoss()
     valid_loss = 100
@@ -84,14 +69,19 @@ def train(args):
 
             # validation
             model.eval()
+            v_loss = 0.0
             for j, data in enumerate(valid_loader):
                 model.train()
                 occupancy, price, label = data
                 predict = model(occupancy, price)
                 loss = loss_function(predict, label)
+                v_loss += loss.item()
                 if loss.item() < valid_loss:
                     valid_loss = loss.item()
                     torch.save(model, './checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
+
+            # scheduler.step()
+                
 
     print(f"----Training finished!----")
     
