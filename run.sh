@@ -75,7 +75,7 @@ if [[ "$dataset" == "PEMS-BAY" ]]; then
   fi
 fi
 
-model_list=("KAN" "Wavelet")
+model_list=("KAN" "PAG")
 
 if [ ${#pre_len_arr[@]} -eq 0 ]; then
     pre_len_arr=("$pre_len")

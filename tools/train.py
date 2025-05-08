@@ -35,10 +35,15 @@ def train(args):
     adj_dense_cuda = adj_dense.to(device)
     adj_sparse = adj_dense.to_sparse_coo().to(device)
 
+    if dataset == 'PEMS-BAY':
+        lr = 0.01
+    else:
+        lr = 0.0001
+
     # training setting
     model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device)
-    optimizer = torch.optim.Adam(model.parameters(), weight_decay=0.00001)
-    # scheduler = OneCycleLR(optimizer, max_lr=0.01, total_steps=n_epoch, verbose=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.00001)
+    scheduler = OneCycleLR(optimizer, max_lr=lr, total_steps=n_epoch)
 
     loss_function = torch.nn.MSELoss()
     valid_loss = 100
@@ -71,22 +76,21 @@ def train(args):
             model.eval()
             v_loss = 0.0
             for j, data in enumerate(valid_loader):
-                model.train()
                 occupancy, price, label = data
                 predict = model(occupancy, price)
                 loss = loss_function(predict, label)
                 v_loss += loss.item()
                 if loss.item() < valid_loss:
                     valid_loss = loss.item()
-                    torch.save(model, './checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
+            torch.save(model, './checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
 
-            # scheduler.step()
+            scheduler.step()
                 
 
     print(f"----Training finished!----")
     
-    model = torch.load('./checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
-    print(f"----Model was saved into folder: {'./checkpoints' + '/' + model_name + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt'}")
+    model = torch.load('./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
+    print(f"----Model was saved into folder: {'./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt'}")
     # test
     model.eval()
     result_list = []
@@ -130,7 +134,7 @@ def train(args):
     output_no_noise = fn.metrics(test_pre=predict_list[1:, :], test_real=label_list[1:, :])
     result_list.append(output_no_noise)
     result_df = pd.DataFrame(columns=['MSE', 'RMSE', 'MAPE', 'RAE', 'MAE', 'R2'], data=result_list)
-    result_df.to_csv('./results' + '/' + model_name + '_' + str(pre_l) + 'bs' + str(bs) + '.csv', encoding='gbk')
+    result_df.to_csv('./results' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + 'bs' + str(bs) + '.csv', encoding='gbk')
 
     # Print average time and memory usage
     print(f'Average time per prediction: {np.mean(time_list)} seconds')

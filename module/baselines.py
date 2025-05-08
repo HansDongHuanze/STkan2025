@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import module.models as models
 import torch.nn.functional as F
 import tools.functions as fn
 import copy
