@@ -43,7 +43,6 @@ def train(args):
     # training setting
     model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.00001)
-    scheduler = OneCycleLR(optimizer, max_lr=lr, total_steps=n_epoch)
 
     loss_function = torch.nn.MSELoss()
     valid_loss = 100
@@ -83,8 +82,6 @@ def train(args):
                 if loss.item() < valid_loss:
                     valid_loss = loss.item()
             torch.save(model, './checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
-
-            scheduler.step()
                 
 
     print(f"----Training finished!----")

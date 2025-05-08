@@ -55,10 +55,13 @@ def get_PEMS(seq_l, pre_l, device):
 
     train_occupancy = train_x[:5000,...,0]
     train_price = train_x[:5000,...,1]
+    train_label = train_y[:5000,...,0]
     valid_occupancy = train_x[5000:7000,...,0]
     valid_price = train_x[5000:7000,...,1]
+    valid_label = train_y[5000:7000,...,0]
     test_occupancy = train_x[7000:10000,...,0]
     test_price = train_x[7000:10000,...,1]
+    test_label = train_y[7000:10000,...,0]
 
     # ====== min-max归一化（以训练集为基准）======
     occ_min = train_occupancy.min()
@@ -73,11 +76,15 @@ def get_PEMS(seq_l, pre_l, device):
     train_price = (train_price - prc_min) / (prc_max - prc_min + 1e-8)
     valid_price = (valid_price - prc_min) / (prc_max - prc_min + 1e-8)
     test_price = (test_price - prc_min) / (prc_max - prc_min + 1e-8)
+
+    train_label = (train_label - prc_min) / (prc_max - prc_min + 1e-8)
+    valid_label = (valid_label - prc_min) / (prc_max - prc_min + 1e-8)
+    test_label = (test_label - prc_min) / (prc_max - prc_min + 1e-8)
     # ========================================
 
-    train_dataset = CreatePEMSDataset(train_occupancy, train_price, train_y[:5000,...,0], seq_l, pre_l, device, adj)
-    test_dataset = CreatePEMSDataset(test_occupancy, test_price, test_y[:2000,...,0], seq_l, pre_l, device, adj)
-    valid_dataset = CreatePEMSDataset(valid_occupancy, valid_price, val_y[:2000,...,0], seq_l, pre_l, device, adj)
+    train_dataset = CreatePEMSDataset(train_occupancy, train_price, train_label, seq_l, pre_l, device, adj)
+    test_dataset = CreatePEMSDataset(test_occupancy, test_price, test_label, seq_l, pre_l, device, adj)
+    valid_dataset = CreatePEMSDataset(valid_occupancy, valid_price, valid_label, seq_l, pre_l, device, adj)
 
     return train_occupancy, train_price, valid_occupancy, valid_price, test_occupancy,  test_price, adj_dense, train_dataset, test_dataset, valid_dataset
 
