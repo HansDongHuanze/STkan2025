@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-import models
 import torch.nn.functional as F
-import functions as fn
+import tools.functions as fn
 import copy
 from torch import vmap
 import pywt
