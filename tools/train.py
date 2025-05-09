@@ -32,30 +32,23 @@ def train(args):
 
     train_occupancy, train_price, train_loader, valid_loader, test_loader, adj_dense = data_switcher.get_data_loaders(dataset, seq_l, pre_l, device, bs)
 
+    node_num = train_occupancy.shape[1]  # 自动获取节点数
     adj_dense_cuda = adj_dense.to(device)
     adj_sparse = adj_dense.to_sparse_coo().to(device)
 
-    if dataset == 'PEMS-BAY':
-        lr = 0.01
-    else:
-        lr = 0.0001
-
     # training setting
-    model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.00001)
-
+    model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device, node_num=node_num)
+    optimizer = torch.optim.Adam(model.parameters(), weight_decay=0.00001)
     loss_function = torch.nn.MSELoss()
-    valid_loss = 100
 
     print(f"----Starting training {model_name} model with prediction horizen {pre_l}----")
 
     if is_train is True:
         model.train()
         if is_pre_train is True:
-            if mode == 'simplified':  # a simplified way of physics-informed meta-learning
+            if mode == 'simplified':
                 model = learner.fast_learning(law_list, model, model_name, p_epoch, bs, train_occupancy, train_price, seq_l, pre_l, device, adj_dense)
-
-            elif mode == 'completed': # the completed process
+            elif mode == 'completed':
                 model = learner.physics_informed_meta_learning(law_list, model, model_name, p_epoch, bs, train_occupancy, train_price, seq_l, pre_l, device, adj_dense)
             else:
                 print("Mode error, skip the pre-training process.")
@@ -64,7 +57,6 @@ def train(args):
             for j, data in enumerate(train_loader):
                 model.train()
                 occupancy, price, label = data
-
                 optimizer.zero_grad()
                 predict = model(occupancy, price)
                 loss = loss_function(predict, label)
@@ -79,8 +71,7 @@ def train(args):
                 predict = model(occupancy, price)
                 loss = loss_function(predict, label)
                 v_loss += loss.item()
-                if loss.item() < valid_loss:
-                    valid_loss = loss.item()
+            v_loss /= len(valid_loader)
             torch.save(model, './checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
                 
 
@@ -128,10 +119,19 @@ def train(args):
     predict_list = torch.cat(predict_list, dim=0).view(-1, pre_l).cpu().detach().numpy()
     label_list = torch.cat(label_list, dim=0).view(-1, pre_l).cpu().detach().numpy()
 
-    output_no_noise = fn.metrics(test_pre=predict_list[1:, :], test_real=label_list[1:, :])
-    result_list.append(output_no_noise)
-    result_df = pd.DataFrame(columns=['MSE', 'RMSE', 'MAPE', 'RAE', 'MAE', 'R2'], data=result_list)
-    result_df.to_csv('./results' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + 'bs' + str(bs) + '.csv', encoding='gbk')
+    result_list = []
+    for i in range(pre_l):
+        output = fn.metrics(
+            test_pre=predict_list[:, i],
+            test_real=label_list[:, i]
+        )
+        # 在每行开头加上horizon步数（从1开始）
+        result_list.append([i+1] + output)
+    result_df = pd.DataFrame(
+        columns=['horizon', 'MSE', 'RMSE', 'MAPE', 'RAE', 'MAE', 'R2'],
+        data=result_list
+    )
+    result_df.to_csv('./results' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + 'bs' + str(bs) + '.csv', encoding='gbk', index=False)
 
     # Print average time and memory usage
     print(f'Average time per prediction: {np.mean(time_list)} seconds')

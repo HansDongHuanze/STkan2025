@@ -161,64 +161,61 @@ class PAG(nn.Module):
         return y
 
 class VAR(nn.Module):
-    def __init__(self, node=247, seq=12, feature=2):  # input_dim = seq_length
+    def __init__(self, node=247, seq=12, feature=2, pre_l=1):
         super(VAR, self).__init__()
-        self.linear = nn.Linear(node*seq*feature, node)
+        self.pre_l = pre_l
+        self.linear = nn.Linear(node*seq*feature, node * pre_l)
+        self.node = node
 
     def forward(self, occ, prc):
         x = torch.cat((occ, prc), dim=2)
         x = torch.flatten(x, 1, 2)
         x = self.linear(x)
+        x = x.view(x.shape[0], self.node, self.pre_l)
         return x
 
 class FCN(nn.Module):
-    def __init__(self, node=247, seq=12, feature=2, hidden_dim=128, num_layers=2):
+    def __init__(self, node=247, seq=12, feature=2, hidden_dim=128, num_layers=2, pre_l=1):
         super(FCN, self).__init__()
+        self.pre_l = pre_l
         input_dim = node * seq * feature
-        
-        # 定义一个简单的全连接层序列
         layers = []
         layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.ReLU())  # 使用 ReLU 作为激活函数
-        
+        layers.append(nn.ReLU())
         for _ in range(num_layers - 1):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
             layers.append(nn.ReLU())
-        
-        layers.append(nn.Linear(hidden_dim, node))
-        
+        layers.append(nn.Linear(hidden_dim, node * pre_l))
         self.network = nn.Sequential(*layers)
+        self.node = node
 
     def forward(self, occ, prc):
-        # 合并和展平输入数据
         x = torch.cat((occ, prc), dim=2)
         x = torch.flatten(x, 1, 2)
-        
-        # 前向传播
         x = self.network(x)
-        
+        x = x.view(x.shape[0], self.node, self.pre_l)
         return x
 
 class LSTM(nn.Module):
-    def __init__(self, seq, n_fea, node=247):
+    def __init__(self, seq, n_fea, node=247, pre_l=1):
         super(LSTM, self).__init__()
         self.nodes = node
-        self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea))  # input.shape: [batch, channel, width, height]
+        self.pre_l = pre_l
+        self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea))
         self.lstm = nn.LSTM(self.nodes, self.nodes, num_layers=2, batch_first=True)
-        self.decoder = nn.Linear(seq-n_fea+1, 1)
+        self.decoder = nn.Linear(seq-n_fea+1, pre_l)
 
     def forward(self, occ, prc):  # occ.shape = [batch, node, seq]
         x = torch.stack([occ, prc], dim=3)
         x = self.encoder(x)
-        x = torch.transpose(x.squeeze(), 1, 2)  # shape [batch, seq-n_fea+1, node]
+        x = torch.transpose(x.squeeze(), 1, 2)
         x, _ = self.lstm(x)
-        x = torch.transpose(x, 1, 2)  # shape [batch, node, seq-n_fea+1]
+        x = torch.transpose(x, 1, 2)
         x = self.decoder(x)
-        x = torch.squeeze(x)
         return x
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, n_heads, pf_dim, dropout):
+    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers, n_heads, pf_dim, dropout, pre_l=1):
         super().__init__()
 
         self.embedding_dim = embedding_dim
@@ -228,6 +225,7 @@ class TransformerModel(nn.Module):
         self.n_heads = n_heads
         self.pf_dim = pf_dim
         self.dropout = dropout
+        self.pre_l = pre_l
 
         self.input_linear = nn.Linear(24, embedding_dim)
 
@@ -235,7 +233,7 @@ class TransformerModel(nn.Module):
         self.encoder = nn.TransformerEncoder(self.encoder_layer, n_layers)
 
         # Adjust the output layer to produce a sequence of the same length as the input
-        self.fc = nn.Linear(embedding_dim, output_dim)  # output_dim should match the number of features you want per time step
+        self.fc = nn.Linear(embedding_dim, pre_l)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, occ, prc):
@@ -255,19 +253,20 @@ class TransformerModel(nn.Module):
         
         # Apply output layer to each sequence element
         output = self.fc(embedded)
-        return output[:,:,-1]
+        return output
 
 
 class GCN(nn.Module):
-    def __init__(self, seq, n_fea, adj_dense):
+    def __init__(self, seq, n_fea, adj_dense, pre_l=1):
         super(GCN, self).__init__()
         self.nodes = adj_dense.shape[0]
+        self.pre_l = pre_l
         self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea))
         self.gcn_l1 = nn.Linear(seq-n_fea+1, seq-n_fea+1)
         self.gcn_l2 = nn.Linear(seq-n_fea+1, seq-n_fea+1)
         self.A = adj_dense
         self.act = nn.ReLU()
-        self.decoder = nn.Linear(seq-n_fea+1, 1)
+        self.decoder = nn.Linear(seq-n_fea+1, pre_l)
 
         # calculate A_delta matrix
         deg = torch.sum(adj_dense, dim=0)
@@ -291,19 +290,20 @@ class GCN(nn.Module):
         x = torch.matmul(self.A, x)
         x = self.act(x)
         x = self.decoder(x)
-        return x[:,:,-1]
+        return x
     
 class GAT(nn.Module):
-    def __init__(self, seq, n_fea, adj_dense, out_features=1, dropout=0.6, alpha=0.2):
+    def __init__(self, seq, n_fea, adj_dense, out_features=1, dropout=0.6, alpha=0.2, pre_l=1):
         super(GAT, self).__init__()
         self.nodes = adj_dense.shape[0]
         self.dropout = dropout
         self.seq = seq
+        self.pre_l = pre_l
 
         # 初始化 GATConv 层
         self.gat1 = GATConv(n_fea, 3, dropout=dropout, heads=3)
         self.gat2 = GATConv(9, out_features, dropout=dropout, heads=1)
-        self.decoder = nn.Linear(seq, 1)
+        self.decoder = nn.Linear(seq, pre_l)
         self.adj = adj_dense
 
     def forward(self, occ, prc):
@@ -322,7 +322,7 @@ class GAT(nn.Module):
 
         x = x.view(-1, self.nodes, self.seq)  # Reshape back to (batch, node, seq)
         x = self.decoder(x)
-        return x.squeeze(-1)
+        return x
 
 class TemporalGatedConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size):
@@ -365,12 +365,13 @@ class SpatialGraphConv(nn.Module):
         return x
 
 class STGCN(nn.Module):
-    def __init__(self, seq, n_fea, adj_dense):
+    def __init__(self, seq, n_fea, adj_dense, pre_l=1):
         super(STGCN, self).__init__()
         self.temporal_conv1 = TemporalGatedConv(n_fea, n_fea, kernel_size=3)
         self.spatial_conv = SpatialGraphConv(n_fea, n_fea, adj_dense)
         self.temporal_conv2 = TemporalGatedConv(n_fea, n_fea, kernel_size=3)
-        self.decoder = nn.Linear(n_fea * seq, 1)
+        self.pre_l = pre_l
+        self.decoder = nn.Linear(n_fea * seq, pre_l)
 
     def forward(self, occ, prc):  # occ.shape = [batch, node, seq]
         x = torch.stack([occ, prc], dim=1)  # Shape: [batch, 2, node, seq]
@@ -394,20 +395,21 @@ class STGCN(nn.Module):
 
         # Final output
         dim = x.shape
-        x = self.decoder(x.reshape(dim[0], dim[1], -1))  # Get final output for the last time step
-        return x[:, :, -1]
+        x = self.decoder(x.reshape(dim[0], dim[1], -1))  # [batch, node, pre_l]
+        return x
 
 class LstmGcn(nn.Module):
-    def __init__(self, seq, n_fea, adj_dense):
+    def __init__(self, seq, n_fea, adj_dense, pre_l=1):
         super(LstmGcn, self).__init__()
         self.A = adj_dense
         self.nodes = adj_dense.shape[0]
+        self.pre_l = pre_l
         self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea), device=device)
         self.gcn_l1 = nn.Linear(seq - n_fea + 1, seq - n_fea + 1, device=device)
         self.gcn_l2 = nn.Linear(seq - n_fea + 1, seq - n_fea + 1, device=device)
         self.lstm = nn.LSTM(self.nodes, self.nodes, num_layers=2, batch_first=True)
         self.act = nn.ReLU()
-        self.decoder = nn.Linear(seq - n_fea + 1, 1, device=device)
+        self.decoder = nn.Linear(seq - n_fea + 1, pre_l, device=device)
 
         # calculate A_delta matrix
         deg = torch.sum(adj_dense, dim=0)
@@ -433,20 +435,20 @@ class LstmGcn(nn.Module):
         x, _ = self.lstm(x)
         x = x.transpose(1, 2)
         x = self.decoder(x)
-        x = torch.squeeze(x)
         return x
 
 
 class LstmGat(nn.Module):
-    def __init__(self, seq, n_fea, adj_dense, adj_sparse):
+    def __init__(self, seq, n_fea, adj_dense, adj_sparse, pre_l=1):
         super(LstmGat, self).__init__()
         self.nodes = adj_dense.shape[0]
+        self.pre_l = pre_l
         self.gcn = nn.Linear(in_features=seq - n_fea + 1, out_features=seq - n_fea + 1, device=device)
         self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea), device=device)
-        self.gat_l1 = models.MultiHeadsGATLayer(adj_sparse, seq - n_fea + 1, seq - n_fea + 1, 4, 0, 0.2)
-        self.gat_l2 = models.MultiHeadsGATLayer(adj_sparse, seq - n_fea + 1, seq - n_fea + 1, 4, 0, 0.2)
+        self.gat_l1 = MultiHeadsGATLayer(adj_sparse, seq - n_fea + 1, seq - n_fea + 1, 4, 0, 0.2)
+        self.gat_l2 = MultiHeadsGATLayer(adj_sparse, seq - n_fea + 1, seq - n_fea + 1, 4, 0, 0.2)
         self.lstm = nn.LSTM(self.nodes, self.nodes, num_layers=2, batch_first=True)
-        self.decoder = nn.Linear(seq - n_fea + 1, 1, device=device)
+        self.decoder = nn.Linear(seq - n_fea + 1, pre_l, device=device)
 
         # Activation
         self.dropout = nn.Dropout(p=0.5)
@@ -474,23 +476,23 @@ class LstmGat(nn.Module):
 
         # decode
         x = self.decoder(x)
-        x = torch.squeeze(x)
         return x
 
 
 class TPA(nn.Module):
-    def __init__(self, seq, n_fea, nodes):
+    def __init__(self, seq, n_fea, nodes, pre_l=1):
         super(TPA, self).__init__()
         self.nodes = nodes
         self.seq = seq
         self.n_fea = n_fea
+        self.pre_l = pre_l
         self.encoder = nn.Conv2d(self.nodes, self.nodes, (n_fea, n_fea), device=device)
         # TPA
         self.lstm = nn.LSTM(self.seq - 1, 2, num_layers=2, batch_first=True, device=device)
         self.fc1 = nn.Linear(in_features=self.seq - 1, out_features=2, device=device)
         self.fc2 = nn.Linear(in_features=2, out_features=2, device=device)
-        self.fc3 = nn.Linear(in_features=2 + 2, out_features=1, device=device)
-        self.decoder = nn.Linear(self.seq, 1, device=device)
+        self.fc3 = nn.Linear(in_features=2 + 2, out_features=pre_l, device=device)
+        self.decoder = nn.Linear(self.seq, pre_l, device=device)
 
     def forward(self, occ, prc):  # occ.shape = [batch, node, seq]
         x = torch.stack([occ, prc], dim=3)
@@ -521,11 +523,12 @@ class TPA(nn.Module):
 
 # https://doi.org/10.1016/j.trc.2023.104205
 class HSTGCN(nn.Module):
-    def __init__(self, seq, n_fea, adj_distance, adj_demand, alpha=0.5):
+    def __init__(self, seq, n_fea, adj_distance, adj_demand, alpha=0.5, pre_l=1):
         super(HSTGCN, self).__init__()
         # hyper-params
         self.nodes = adj_distance.shape[0]
         self.alpha = alpha
+        self.pre_l = pre_l
         hidden = seq - n_fea + 1
 
         # network components
@@ -539,7 +542,7 @@ class HSTGCN(nn.Module):
         self.gru2 = nn.GRU(self.nodes, self.nodes, num_layers=2, batch_first=True)
         self.decoder = nn.Sequential(nn.Linear(hidden, 16),
         nn.ReLU(),
-        nn.Linear(16, 1)
+        nn.Linear(16, pre_l)
         )
         
         self.act = nn.ReLU()
@@ -595,7 +598,6 @@ class HSTGCN(nn.Module):
         # decode
         output = self.alpha * x1 + (1-self.alpha) * x2
         output = self.decoder(output)
-        output = torch.squeeze(output)
         return output
 
 

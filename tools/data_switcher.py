@@ -68,6 +68,8 @@ def get_PEMS(seq_l, pre_l, device):
     occ_max = train_occupancy.max()
     prc_min = train_price.min()
     prc_max = train_price.max()
+    label_min = train_label.min()
+    label_max = train_label.max()
 
     train_occupancy = (train_occupancy - occ_min) / (occ_max - occ_min + 1e-8)
     valid_occupancy = (valid_occupancy - occ_min) / (occ_max - occ_min + 1e-8)
@@ -77,9 +79,9 @@ def get_PEMS(seq_l, pre_l, device):
     valid_price = (valid_price - prc_min) / (prc_max - prc_min + 1e-8)
     test_price = (test_price - prc_min) / (prc_max - prc_min + 1e-8)
 
-    train_label = (train_label - prc_min) / (prc_max - prc_min + 1e-8)
-    valid_label = (valid_label - prc_min) / (prc_max - prc_min + 1e-8)
-    test_label = (test_label - prc_min) / (prc_max - prc_min + 1e-8)
+    train_label = (train_label - label_min) / (label_max - label_min + 1e-8)
+    valid_label = (valid_label - label_min) / (label_max - label_min + 1e-8)
+    test_label = (test_label - label_min) / (label_max - label_min + 1e-8)
     # ========================================
 
     train_dataset = CreatePEMSDataset(train_occupancy, train_price, train_label, seq_l, pre_l, device, adj)

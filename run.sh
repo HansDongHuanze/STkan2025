@@ -75,7 +75,8 @@ if [[ "$dataset" == "PEMS-BAY" ]]; then
   fi
 fi
 
-model_list=("KAN" "PAG")
+model_list=("KAN" "PAG" "VAR" "FCN" "LSTM" "TransformerModel" "GCN" "GAT" "STGCN" "LstmGcn" "LstmGat" "HSTGCN" "TPA" "FGN" \
+  "GAF" "SGCTN" "WaveSTFTGAT" "waveletGAT" "FreTimeFusion" "FourierGAT" "CoupFourGAT" "CoupFourGAT_v2")
 
 if [ ${#pre_len_arr[@]} -eq 0 ]; then
     pre_len_arr=("$pre_len")
