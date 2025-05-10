@@ -6,6 +6,7 @@ dataset="ST-EVCDP"
 seq_len=12
 pre_len=6
 is_pre_train=True
+use_bspline="false"
 
 result_dir="./results"
 if [ ! -d "$result_dir" ]; then
@@ -44,6 +45,10 @@ for ARG in "$@"; do
       is_pre_train="${ARG#*=}"
       shift
       ;;
+    use_bspline=*)
+      use_bspline="${ARG#*=}"
+      shift
+      ;;
     *)
       echo "Unknown argument: $ARG"
       exit 1
@@ -76,7 +81,7 @@ if [[ "$dataset" == "PEMS-BAY" ]]; then
 fi
 
 model_list=("KAN" "PAG" "VAR" "FCN" "LSTM" "TransformerModel" "GCN" "GAT" "STGCN" "LstmGcn" "LstmGat" "HSTGCN" "TPA" "FGN" \
-  "GAF" "SGCTN" "WaveSTFTGAT" "waveletGAT" "FreTimeFusion" "FourierGAT" "CoupFourGAT" "CoupFourGAT_v2")
+  "GAF" "SGCTN" "WaveSTFTGAT" "waveletGAT" "FreTimeFusion" "FourierGAT" "CoupFourGAT" "CoupFourGAT_v2" "STAK" "SWAK")
 
 if [ ${#pre_len_arr[@]} -eq 0 ]; then
     pre_len_arr=("$pre_len")
@@ -90,7 +95,8 @@ for p in "${pre_len_arr[@]}"; do
           --dataset="$dataset" \
           --seq_len="$seq_len" \
           --pre_len="$p" \
-          --is_pre_train="$is_pre_train"
+          --is_pre_train="$is_pre_train" \
+          --use_bspline="$use_bspline"
       done
   else
       python -u start.py \
@@ -98,7 +104,8 @@ for p in "${pre_len_arr[@]}"; do
       --dataset="$dataset" \
       --seq_len="$seq_len" \
       --pre_len="$p" \
-      --is_pre_train="$is_pre_train"
+      --is_pre_train="$is_pre_train" \
+      --use_bspline="$use_bspline"
   fi
 done
 

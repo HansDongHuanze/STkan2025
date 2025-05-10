@@ -12,3 +12,4 @@ geopy
 torch_geometric
 tables
 pytorch_wavelets
+PyWavelets

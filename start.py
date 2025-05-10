@@ -26,5 +26,6 @@ if __name__ == "__main__":
     parser.add_argument('--is_pre_train', type=str2bool, default=True)
     parser.add_argument('--random_seed', type=int, default=2025)
     parser.add_argument('--mode', type=str, default='completed')
+    parser.add_argument('--use_bspline', type=str2bool, default=False, help='Whether to use B-spline in KAN/STAN.')
     args = parser.parse_args()
     train(args)

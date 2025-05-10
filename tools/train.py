@@ -37,9 +37,14 @@ def train(args):
     adj_sparse = adj_dense.to_sparse_coo().to(device)
 
     # training setting
-    model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device, node_num=node_num)
+    model = model_switcher.choose_model(model_name, seq_l, pre_l, adj_dense, device=device, node_num=node_num, use_bspline=args.use_bspline)
     optimizer = torch.optim.Adam(model.parameters(), weight_decay=0.00001)
     loss_function = torch.nn.MSELoss()
+
+    # 文件名后缀，STAK模型时注明bspline
+    bspline_tag = ''
+    if model_name == 'STAK':
+        bspline_tag = '_bspline' if args.use_bspline else '_nobspline'
 
     print(f"----Starting training {model_name} model with prediction horizen {pre_l}----")
 
@@ -72,13 +77,13 @@ def train(args):
                 loss = loss_function(predict, label)
                 v_loss += loss.item()
             v_loss /= len(valid_loader)
-            torch.save(model, './checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
+            torch.save(model, './checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + bspline_tag + '.pt')
                 
 
     print(f"----Training finished!----")
     
-    model = torch.load('./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt')
-    print(f"----Model was saved into folder: {'./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + '.pt'}")
+    model = torch.load('./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + bspline_tag + '.pt')
+    print(f"----Model was saved into folder: {'./checkpoints' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + '_bs' + str(bs) + '_' + mode + bspline_tag + '.pt'}")
     # test
     model.eval()
     result_list = []
@@ -131,7 +136,7 @@ def train(args):
         columns=['horizon', 'MSE', 'RMSE', 'MAPE', 'RAE', 'MAE', 'R2'],
         data=result_list
     )
-    result_df.to_csv('./results' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + 'bs' + str(bs) + '.csv', encoding='gbk', index=False)
+    result_df.to_csv('./results' + '/' + model_name + '_' + dataset + '_' + str(pre_l) + 'bs' + str(bs) + bspline_tag + '.csv', encoding='gbk', index=False)
 
     # Print average time and memory usage
     print(f'Average time per prediction: {np.mean(time_list)} seconds')
