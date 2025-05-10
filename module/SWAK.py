@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.interpolate import BSpline
-import pywt
+from pytorch_wavelets import DWT1DForward
 
 class KANLayer(nn.Module):
     def __init__(self, input_dim, output_dim, degree=3, use_bspline=False, n_basis=8, adj=None):
@@ -69,25 +69,29 @@ class KANLayer(nn.Module):
 class SWAK(nn.Module):
     def __init__(self, input_dim=12, output_dim=1, degree=3, use_bspline=False, n_basis=8, adj=None):
         super().__init__()
-        self.wavelet = 'db1'
+        self.dwt = DWT1DForward(J=1, wave='db1', mode='zero')
         # 推断小波变换后长度
-        test_arr = np.zeros(input_dim)
-        cA, _ = pywt.dwt(test_arr, self.wavelet)
-        self.wave_len = len(cA)
+        test_arr = torch.zeros(1, 1, input_dim)
+        cA, _ = self.dwt(test_arr)
+        self.wave_len = cA.shape[-1]
         self.res_wave = nn.Linear(self.wave_len, output_dim)
         self.kan_layer_wave = KANLayer(self.wave_len, output_dim, degree, use_bspline, n_basis, adj)
+        self.adj = adj
 
     def forward(self, x, occ=None):
-        # x: (batch, node, seq_len)
-        # 批量小波变换：对每个节点的时间序列做dwt，取cA
-        x_np = x.detach().cpu().numpy()  # (batch, node, seq_len)
-        batch, node, seq_len = x_np.shape
-        x_wave = np.zeros((batch, node, self.wave_len), dtype=np.float32)
-        for b in range(batch):
-            for n in range(node):
-                cA, _ = pywt.dwt(x_np[b, n, :], self.wavelet)
-                x_wave[b, n, :len(cA)] = cA  # 若cA比wave_len短则补零
-        x_wave = torch.tensor(x_wave, device=x.device, dtype=x.dtype)
-        res = self.res_wave(x_wave)
-        out = self.kan_layer_wave(x_wave)
+        x = x.float()
+        batch, node, seq_len = x.shape
+        x_reshape = x.reshape(batch * node, 1, seq_len)
+        cA, _ = self.dwt(x_reshape)
+        cA = cA.squeeze(1).reshape(batch, node, -1)
+        wave_len = cA.shape[-1]
+        # 动态创建/更新 res_wave 和 kan_layer_wave
+        if (not hasattr(self, 'res_wave')) or (self.res_wave.in_features != wave_len):
+            self.res_wave = nn.Linear(wave_len, self.kan_layer_wave.output_dim if hasattr(self, 'kan_layer_wave') else 1).to(x.device)
+        if (not hasattr(self, 'kan_layer_wave')) or (self.kan_layer_wave.input_dim != wave_len):
+            out_dim = self.kan_layer_wave.output_dim if hasattr(self, 'kan_layer_wave') else self.res_wave.out_features
+            self.kan_layer_wave = KANLayer(wave_len, out_dim, degree=3, use_bspline=False, n_basis=8, adj=self.adj).to(x.device)
+        cA_flat = cA.view(-1, wave_len)
+        res = self.res_wave(cA_flat).view(batch, node, -1)
+        out = self.kan_layer_wave(cA)
         return out + res  # (batch, node, output_dim)
